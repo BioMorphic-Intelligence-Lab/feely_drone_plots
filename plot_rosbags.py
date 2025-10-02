@@ -6,6 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from pathlib import Path
 from scipy.spatial.transform import Rotation as R
+from matplotlib.patches import FancyBboxPatch
 
 from rosbags.typesys import Stores, get_types_from_msg, get_typestore
 from rosbags.rosbag2 import Reader
@@ -18,7 +19,7 @@ COLORS = {
     "color_x": "#008E2B",
     "color_yaw": "#001A83",
     "dark_grey": "#2e2e2e",
-    "color_contact": "red"
+    "contact": "#ED5349"
 }
 
 STATE_COLORS = {
@@ -48,7 +49,8 @@ def rosbag2data(path: str):
     add_types = {}
 
     for pathstr in [
-        "/home/antbre/projects/feely_drone/feely_drone_ros2/src/custom_msgs/msg/StateMachineState.msg"
+        "/home/antbre/projects/feely_drone/feely_drone_ros2/src/custom_msgs/msg/StateMachineState.msg",
+        "/home/antbre/projects/feely_drone/feely_drone_ros2/src/custom_msgs/msg/TouchData.msg"
         ]:
         msgpath = Path(pathstr)
         msgdef = msgpath.read_text(encoding='utf-8')
@@ -63,6 +65,7 @@ def rosbag2data(path: str):
     t_ref = []
     t_pose = []
     t_contact = []
+    t_touch = []
     t_target = []
     t_state_machine = []
 
@@ -71,6 +74,7 @@ def rosbag2data(path: str):
     position = []
     yaw = []
     contact = []
+    touch_data = []
     target = []
     target_yaw = []
     state_machine = []
@@ -100,31 +104,39 @@ def rosbag2data(path: str):
                 msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
                 t_contact += [float(msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec)]
                 contact += [msg.position]
+            if connection.topic == '/feely_drone/out/touch_data':
+                msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
+                t_touch += [float(msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec)]
+                touch_data += [msg.raw_data]
             if connection.topic == '/feely_drone/out/state_machine_state':
                 msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
                 t_state_machine += [float(msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec)]
                 state_machine += [msg.state]
   
     
-    t_start = min(np.concatenate((t_ref, t_pose, t_contact, t_target, t_state_machine)))
+    t_start = min(np.concatenate((t_ref, t_pose, t_contact, t_touch,
+                                  t_target, t_state_machine)))
     t_ref = np.array(t_ref) - t_start
     t_pose = np.array(t_pose) - t_start
     t_target = np.array(t_target) - t_start
     t_contact = np.array(t_contact) - t_start
-    t_state_machine = np.array(t_state_machine) - t_start
+    t_touch = np.array(t_touch) - t_start
+    t_state_machine = np.array(t_state_machine) - t_start - 80 + 61
 
     ref_position = np.array(ref_position)
     ref_yaw = np.array(ref_yaw)
     position = np.array(position)
     yaw = np.array(yaw)
     contact = np.array(contact)
+    touch_data = np.array(touch_data)
     target = np.array(target)
     target_yaw = np.array(target_yaw)
     state_machine = np.array(state_machine)
 
     return {"t_ref": t_ref, "ref_position": ref_position, "ref_yaw": ref_yaw,
             "t_pose": t_pose, "position": position, "yaw": yaw,
-            "t_contact": t_contact, "contact": contact,
+            "t_contact": t_contact, "contact": contact, 
+            "t_touch": t_touch, "touch_data": touch_data,
             "t_target": t_target, "target": target, "target_yaw": target_yaw,
             "t_state_machine": t_state_machine, "state_machine": state_machine} 
 
@@ -160,7 +172,8 @@ def make_time_series_plot(data, end_times):
                            left=0.08, right=0.98, top=0.90, bottom=0.2) 
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    axs = [ax1, ax2]
+    #ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    axs = [ax1, ax2]#, ax3]
 
     t_end = max(end_times) + 1
 
@@ -168,25 +181,32 @@ def make_time_series_plot(data, end_times):
         # Find end index
         end_idx = np.argmax(d["t_pose"] > end_times[i])
         # Find first contact index
-        contact_idx = np.min(np.argmax(d["contact"] > 0.5, axis=0))
+        contacts = (d["state_machine"] == 2)
+        contact_idx = np.argmax(contacts)
         # Find index of position closest to contact
-        contact_time = d["t_contact"][contact_idx]
+        contact_time = d["t_state_machine"][contact_idx]
         pose_idx = np.argmin(np.abs(d["t_pose"] - contact_time))
 
         axs[0].plot(d["t_pose"][:end_idx], d["position"][:end_idx,0], label=r"\$x\$", color=COLORS["color_x"], alpha=0.4)
         axs[0].plot(d["t_pose"][end_idx], d["position"][end_idx, 0], marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)
+        #axs[0].plot(d["t_pose"][pose_idx], d["position"][pose_idx, 0], marker="o", color=COLORS["contact"],
+        #            markersize=8, label="Contact", zorder=10, alpha=0.8)
         axs[0].set_ylabel(r"\$x\$ [m]")
         axs[0].set_yticks(np.linspace(-2.0, 1.0, 4, endpoint=True))
         
         axs[1].plot(d["t_pose"][:end_idx], d["yaw"][:end_idx] * 180/np.pi, label="yaw", color=COLORS["color_yaw"], alpha=0.8)
         axs[1].plot(d["t_pose"][end_idx], d["yaw"][end_idx] * 180/np.pi, marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)
+        #axs[1].plot(d["t_pose"][pose_idx], d["yaw"][pose_idx] * 180/np.pi, marker="o", color=COLORS["contact"],
+        #        markersize=8, label="Contact", zorder=10, alpha=0.8)
         axs[1].set_ylim([-32, 32])
         axs[1].set_yticks([-30, -15, 0, 15, 30])
         axs[1].set_xticks(np.linspace(0, 100, 11, endpoint=True))
         axs[1].set_ylabel(r"Yaw [\$^\circ\$]")
         axs[1].set_xlabel(r"Time [s]")
+
+        #axs[2].step(d["t_state_machine"], d["state_machine"], where='post', color=COLORS["dark_grey"])
 
     t_target = np.array([0, t_end])
     axs[1].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target yaw", color="black")
@@ -206,9 +226,12 @@ def make_time_series_plot(data, end_times):
     axs[1].yaxis.labelpad = ylabelpad
     axs[1].xaxis.labelpad = xlabelpad
 
+    #axs[2].set_yticks([0, 1, 2, 3, 4, 5, 6, 7])
+    #axs[2].set_ylim([-0.5, 7.5])
+
     return fig
 
-def make_3d_plot(data, end_time, trial_names):
+def make_3d_plot(data, end_times, trial_names):
     fig = plt.figure(figsize=10 * np.array([1.5,1]))
     gs = gridspec.GridSpec(2, 3, hspace=0.1, wspace=0.25,
                            width_ratios=[1, 1, 0.05]) 
@@ -279,6 +302,30 @@ def make_3d_plot(data, end_time, trial_names):
         axs[i].xaxis.labelpad = xlabelpad
         axs[i].zaxis.labelpad = zlabelpad
 
+        # Create a 2D overlay axis for the text box (to get independent width/height control)
+        overlay_ax = fig.add_axes(axs[i].get_position(), frameon=False)
+        overlay_ax.set_xlim(0, 1)
+        overlay_ax.set_ylim(0, 1)
+        overlay_ax.set_xticks([])
+        overlay_ax.set_yticks([])
+        
+        # Define box dimensions independently
+        box_width = 0.5   # width as fraction of axes width
+        box_height = 0.15  # height as fraction of axes height
+        box_x = 0.05       # x position
+        box_y = 0.86       # y position (top-left style positioning)
+        
+        # Add the rounded rectangle with independent width/height control
+        rounded_box = FancyBboxPatch(
+            (box_x, box_y - box_height), box_width, box_height,  # subtract height for top-left positioning
+            boxstyle="round,pad=0.01",
+            facecolor='grey',
+            alpha=0.3,
+            edgecolor='none',
+            transform=overlay_ax.transAxes
+        )
+        overlay_ax.add_patch(rounded_box)
+
         # Add text in the top-left corner
         axs[i].text2D(0.1, 0.8, rf"Trial {trial_names[i]}", 
                     transform=axs[i].transAxes, 
@@ -315,6 +362,75 @@ def make_3d_plot(data, end_time, trial_names):
     
     return fig
 
+def make_contact_plot(data, end_time, index):
+    fig = plt.figure(figsize=7 * np.array([2.5,1]))
+    gs = gridspec.GridSpec(2, 1, hspace=0.2, wspace=0.15,
+                           left=0.08, right=0.98, top=0.95, bottom=0.15,
+                           height_ratios=[2, 1]) 
+    ax1 = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    #ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    axs = [ax1, ax2]#, ax3]
+
+    d = data[index]
+
+    t_start = min(d["t_contact"][0], d["t_touch"][0])
+    t_end = end_time - t_start
+       
+    # Find end index
+    contact_end_idx = np.argmax(d["t_contact"] > end_time)
+    touch_end_idx = np.argmax(d["t_touch"] > end_time)
+    
+    contacts_scaled =  np.linspace(1, 12, num=12, endpoint=True) * d["contact"][:contact_end_idx, :]
+    axs[0].plot(d["t_contact"][:contact_end_idx] - t_start, contacts_scaled, linewidth=0, marker="o",
+                label=r"Binary Contact Signal", alpha=0.4, color=COLORS["contact"])
+    
+    # Plot each touch_data channel with progressive shades of grey
+    num_channels = d["touch_data"].shape[1]
+    for i in range(num_channels):
+        # Calculate progressive shade of grey (from light to dark)
+        grey_val = 0.3 + 0.6 * (i / (num_channels - 1))  # 0.3 (dark) to 0.9 (light)
+        color = (grey_val, grey_val, grey_val)
+        axs[1].plot(
+            d["t_touch"][:touch_end_idx] - t_start,
+            d["touch_data"][:touch_end_idx, i],
+            label=f"Raw {i+1}",
+            alpha=0.8,
+            color=color
+        )
+    
+    axs[1].set_xticks(np.linspace(0, 100, 11, endpoint=True))
+    axs[1].set_ylabel(r"Value [-]")
+    axs[1].set_xlabel(r"Time [s]")
+
+    #axs[2].step(d["t_state_machine"], d["state_machine"], where='post', color=COLORS["dark_grey"])
+
+    axs[0].set_ylabel(r"Contact \$\in\mathcal{B}\$")
+    axs[0].set_ylim([0.5, 12.5])
+    axs[0].set_yticks(np.linspace(1, 12, num=12, endpoint=True))
+    axs[0].set_yticklabels(
+        [rf"\$\mathcal{{C}}_{{{i}}}\$" if i > 9
+         else rf"\$\mathcal{{C}}_{{\phantom{{0}}{i}}}\$"  for i in range(1, 13)])
+    axs[0].set_xlim([0, t_end])
+    plt.setp(axs[0].get_xticklabels(), visible=False)
+
+    xlabelpad = 20
+    ylabelpad = 45
+    tickpad = 20
+
+    axs[0].tick_params(axis='both', pad=tickpad)
+    axs[1].tick_params(axis='both', pad=tickpad)
+   
+    axs[0].yaxis.labelpad = - 2.3 * ylabelpad
+    axs[0].xaxis.labelpad = xlabelpad
+    axs[1].yaxis.labelpad = ylabelpad
+    axs[1].xaxis.labelpad = xlabelpad
+
+    #axs[2].set_yticks([0, 1, 2, 3, 4, 5, 6, 7])
+    #axs[2].set_ylim([-0.5, 7.5])
+
+    return fig
+
 
 def main():
     paths = [
@@ -342,17 +458,22 @@ def main():
     end_times = np.array([43.0, 46.0, 35.0, 33.0,
                           33.5, 43.4, 52.0, 48.0,
                           32.0, 38.0, 37.0, 73.0,
-                          41.0, 42.0])
+                          41.0, 42.0
+                          ])
     
     # Create and save time series plots
     #fig = make_time_series_plot(data, end_times)
     #fig.savefig("time_series_plot.svg")
+
+    # Create and save contact threshold plot
+    fig = make_contact_plot(data, 54, -1)
+    fig.savefig("contact_plot.svg")
     
-    fig = make_3d_plot(data[[3, 7, 11, 13]],
-                       end_times[[3, 7, 11, 13]],
-                       trial_names=["III", "VII", "XI", "XIII"])
-    fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
-        transparent=False)
+    #fig = make_3d_plot(data[[3, 7, 11, 13]],
+    #                   end_times[[3, 7, 11, 13]],
+    #                   trial_names=["III", "VII", "XI", "XIII"])
+    #fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
+    #    transparent=False)
 
 if __name__=="__main__":
     main()

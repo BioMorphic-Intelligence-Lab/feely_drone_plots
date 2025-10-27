@@ -19,7 +19,8 @@ COLORS = {
     "color_x": "#008E2B",
     "color_yaw": "#001A83",
     "dark_grey": "#2e2e2e",
-    "contact": "#ED5349"
+    "contact": "#ED5349",
+    "color_trunk": "#8B4513"
 }
 
 STATE_COLORS = {
@@ -247,7 +248,7 @@ def make_3d_plot(data, end_times, trial_names):
 
     for i, d in enumerate(data):
 
-        end_idx = np.argmax(d["t_pose"] > end_time[i])
+        end_idx = np.argmax(d["t_pose"] > end_times[i])
         # Create points for LineCollection
         points = np.array([d["position"][:end_idx, 0],
                         d["position"][:end_idx, 1],
@@ -274,7 +275,7 @@ def make_3d_plot(data, end_times, trial_names):
         x_grid = rotated_xyz[0, :].reshape(x_grid.shape) + cylinder_pos[0]
         y_grid = rotated_xyz[1, :].reshape(y_grid.shape) + cylinder_pos[1]
         z_grid = rotated_xyz[2, :].reshape(z_grid.shape) + cylinder_pos[2]
-        axs[i].plot_surface(x_grid, y_grid, z_grid, color=COLORS["dark_grey"], alpha=0.6)   
+        axs[i].plot_surface(x_grid, y_grid, z_grid, color=COLORS["color_trunk"], alpha=0.6)   
         
         # Set limits and labels
         axs[i].set_xlim([-2.0, 1.0])
@@ -381,37 +382,77 @@ def make_contact_plot(data, end_time, index):
     contact_end_idx = np.argmax(d["t_contact"] > end_time)
     touch_end_idx = np.argmax(d["t_touch"] > end_time)
     
+    # Mask for before 10s and after 30s
+    t = d["t_contact"][:contact_end_idx] - t_start
+    mask_before = t < 2.5
+    mask_after = t > 30
+
     contacts_scaled =  np.linspace(1, 12, num=12, endpoint=True) * d["contact"][:contact_end_idx, :]
-    axs[0].plot(d["t_contact"][:contact_end_idx] - t_start, contacts_scaled, linewidth=0, marker="o",
+    axs[0].plot(t[mask_before],
+                contacts_scaled[mask_before],
+                linewidth=0, marker="o",
                 label=r"Binary Contact Signal", alpha=0.4, color=COLORS["contact"])
+    axs[0].plot(t[mask_after] - 30 + 10,
+                contacts_scaled[mask_after],
+                linewidth=0, marker="o",
+            label=r"Binary Contact Signal", alpha=0.4, color=COLORS["contact"])
     
-    # Plot each touch_data channel with progressive shades of grey
+    # Add a break indicator ("...") at the jump
+    if np.any(mask_before) and np.any(mask_after):
+        # Plot a short vertical dotted line and text
+        axs[0].text(5, 4.5, "...", ha="center", va="center", fontsize=16, color="black")
+
+    # Plot each touch_data channel with progressive shades of grey, skipping 10-30s
     num_channels = d["touch_data"].shape[1]
+    drawn = False
     for i in range(num_channels):
-        # Calculate progressive shade of grey (from light to dark)
         grey_val = 0.3 + 0.6 * (i / (num_channels - 1))  # 0.3 (dark) to 0.9 (light)
         color = (grey_val, grey_val, grey_val)
+
+        # Mask for before 10s and after 30s
+        t = d["t_touch"][:touch_end_idx] - t_start
+        mask_before = t < 2.5
+        mask_after = t > 30
+
+        # Plot before 10s
         axs[1].plot(
-            d["t_touch"][:touch_end_idx] - t_start,
-            d["touch_data"][:touch_end_idx, i],
-            label=f"Raw {i+1}",
+            t[mask_before],
+            d["touch_data"][:touch_end_idx, i][mask_before],
+            label=f"Raw {i+1}" if i == 0 else None,
             alpha=0.8,
             color=color
         )
-    
-    axs[1].set_xticks(np.linspace(0, 100, 11, endpoint=True))
+        # Plot after 30s
+        axs[1].plot(
+            t[mask_after] - 30 + 10,
+            d["touch_data"][:touch_end_idx, i][mask_after],
+            alpha=0.8,
+            color=color
+        )
+
+        # Add a break indicator ("...") at the jump
+        if np.any(mask_before) and np.any(mask_after) and not drawn:
+            drawn = True
+            # Find y at the end of before and start of after
+            y_before = d["touch_data"][:touch_end_idx, i][mask_before][-1]
+            y_after = d["touch_data"][:touch_end_idx, i][mask_after][0]
+            # Plot a short vertical dotted line and text
+            axs[1].text(5, (y_before + y_after)/2, "...", ha="center", va="center", fontsize=16, color="black")
+
+    axs[1].set_xticks([0, 5, 10, 20, 30, 40, 60, 70, 80, 90, 100])
+    axs[1].set_xticklabels([0, "...", 30, 40, 60, 70, 80, 90, 100, 110, 120])
     axs[1].set_ylabel(r"Value [-]")
     axs[1].set_xlabel(r"Time [s]")
 
     #axs[2].step(d["t_state_machine"], d["state_machine"], where='post', color=COLORS["dark_grey"])
 
     axs[0].set_ylabel(r"Contact \$\in\mathcal{B}\$")
-    axs[0].set_ylim([0.5, 12.5])
-    axs[0].set_yticks(np.linspace(1, 12, num=12, endpoint=True))
+    axs[0].set_ylim([0.5, 9.5])
+    axs[0].set_yticks(np.linspace(1, 9, num=9, endpoint=True))
     axs[0].set_yticklabels(
-        [rf"\$\mathcal{{C}}_{{{i}}}\$" if i > 9
-         else rf"\$\mathcal{{C}}_{{\phantom{{0}}{i}}}\$"  for i in range(1, 13)])
-    axs[0].set_xlim([0, t_end])
+        [rf"\$\mathcal{{C}}_{{{i}}}\$"  for i in range(1, 10)]
+    )
+    axs[0].set_xlim([0, t_end - 20])
     plt.setp(axs[0].get_xticklabels(), visible=False)
 
     xlabelpad = 20
@@ -421,7 +462,7 @@ def make_contact_plot(data, end_time, index):
     axs[0].tick_params(axis='both', pad=tickpad)
     axs[1].tick_params(axis='both', pad=tickpad)
    
-    axs[0].yaxis.labelpad = - 2.3 * ylabelpad
+    axs[0].yaxis.labelpad = - 0.8 * ylabelpad
     axs[0].xaxis.labelpad = xlabelpad
     axs[1].yaxis.labelpad = ylabelpad
     axs[1].xaxis.labelpad = xlabelpad
@@ -466,14 +507,14 @@ def main():
     #fig.savefig("time_series_plot.svg")
 
     # Create and save contact threshold plot
-    fig = make_contact_plot(data, 54, -1)
-    fig.savefig("contact_plot.svg")
+    #fig = make_contact_plot(data, 54, -1)
+    #fig.savefig("contact_plot.svg")
     
-    #fig = make_3d_plot(data[[3, 7, 11, 13]],
-    #                   end_times[[3, 7, 11, 13]],
-    #                   trial_names=["III", "VII", "XI", "XIII"])
-    #fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
-    #    transparent=False)
+    fig = make_3d_plot(data[[3, 7, 11, 13]],
+                       end_times[[3, 7, 11, 13]],
+                       trial_names=["III", "VII", "XI", "XIII"])
+    fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
+        transparent=False)
 
 if __name__=="__main__":
     main()

@@ -17,6 +17,7 @@ COLORS = {
     "biomorphic_blue_complimentary": "#FE8C00",
     "delft_blue": "#00A6D6",
     "color_x": "#008E2B",
+    "color_y": "#FF5100",
     "color_yaw": "#001A83",
     "dark_grey": "#2e2e2e",
     "contact": "#ED5349",
@@ -35,6 +36,16 @@ import matplotlib as mpl
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['svg.fonttype'] = 'none'
 mpl.rcParams['axes.unicode_minus'] = False
+
+start_times = [2, 0, 5, 6,
+               3, 3, 3, 3,
+               5, 5, 7, 5,
+               8, 8]
+
+roman_numerals = ['(i)', '(ii)', '(iii)', '(iv)',
+                  '(v)', '(vi)', '(vii)', '(viii)',
+                  '(ix)', '(x)', '(xi)', '(xii)',
+                  '(xiii)', '(xiv)']
 
 def guess_msgtype(path: Path) -> str:
     """Guess message type name from path."""
@@ -168,19 +179,20 @@ def process_data(data, cutoff=0):
     return data
 
 def make_time_series_plot(data, end_times):
-    fig = plt.figure(figsize=6 * np.array([3,1]))
-    gs = gridspec.GridSpec(2, 1, hspace=0.2, wspace=0.15,
-                           left=0.08, right=0.98, top=0.90, bottom=0.2) 
+    fig = plt.figure(figsize=6 * np.array([1.0, 1.25]))
+    gs = gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.25,
+                           left=0.2, right=0.98, top=0.9999, bottom=0.15) 
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    #ax3 = fig.add_subplot(gs[2], sharex=ax1)
-    axs = [ax1, ax2]#, ax3]
+    ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    axs = [ax1, ax2, ax3]
 
     t_end = max(end_times) + 1
 
     for i, d in enumerate(data):
         # Find end index
         end_idx = np.argmax(d["t_pose"] > end_times[i])
+        start_idx = np.argmax(d["t_pose"] > start_times[i])
         # Find first contact index
         contacts = (d["state_machine"] == 2)
         contact_idx = np.argmax(contacts)
@@ -188,47 +200,148 @@ def make_time_series_plot(data, end_times):
         contact_time = d["t_state_machine"][contact_idx]
         pose_idx = np.argmin(np.abs(d["t_pose"] - contact_time))
 
-        axs[0].plot(d["t_pose"][:end_idx], d["position"][:end_idx,0], label=r"\$x\$", color=COLORS["color_x"], alpha=0.4)
-        axs[0].plot(d["t_pose"][end_idx], d["position"][end_idx, 0], marker="o", color=COLORS["dark_grey"],
+
+        axs[0].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
+                    d["position"][start_idx:end_idx,0], label=r"\$x\$", color=COLORS["color_x"], alpha=0.4)
+        axs[0].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                    d["position"][end_idx, 0], marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)
-        #axs[0].plot(d["t_pose"][pose_idx], d["position"][pose_idx, 0], marker="o", color=COLORS["contact"],
-        #            markersize=8, label="Contact", zorder=10, alpha=0.8)
-        axs[0].set_ylabel(r"\$x\$ [m]")
-        axs[0].set_yticks(np.linspace(-2.0, 1.0, 4, endpoint=True))
+        axs[1].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
+                    d["position"][start_idx:end_idx,1], label=r"\$y\$", color=COLORS["color_y"], alpha=0.4)
+        axs[1].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                    d["position"][end_idx, 1], marker="o", color=COLORS["dark_grey"],
+                    markersize=8, label="Perched", zorder=10, alpha=0.8)
+        axs[2].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
+                    d["yaw"][start_idx:end_idx] * 180/np.pi, label="yaw", color=COLORS["color_yaw"], alpha=0.8)
+        axs[2].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                    d["yaw"][end_idx] * 180/np.pi, marker="o", color=COLORS["dark_grey"],
+                    markersize=8, label="Perched", zorder=10, alpha=0.8)    
+
+    axs[0].set_ylabel(r"\$x\$ [m]")
+    axs[0].set_yticks(np.linspace(-2.0, 1.0, 4, endpoint=True))
+
+    axs[1].set_ylabel(r"\$y\$ [m]")
+    axs[1].set_yticks(np.linspace(-1.0, 1.0, 3, endpoint=True))
+    axs[2].set_ylim([-32, 32])
+    axs[2].set_yticks([-30, -15, 0, 15, 30])
+    axs[2].set_xticks(np.linspace(0, 100, 11, endpoint=True))
+    axs[2].set_ylabel(r"Yaw [\$^\circ\$]")
+    axs[2].set_xlabel(r"Time [s]")
+
         
-        axs[1].plot(d["t_pose"][:end_idx], d["yaw"][:end_idx] * 180/np.pi, label="yaw", color=COLORS["color_yaw"], alpha=0.8)
-        axs[1].plot(d["t_pose"][end_idx], d["yaw"][end_idx] * 180/np.pi, marker="o", color=COLORS["dark_grey"],
-                    markersize=8, label="Perched", zorder=10, alpha=0.8)
-        #axs[1].plot(d["t_pose"][pose_idx], d["yaw"][pose_idx] * 180/np.pi, marker="o", color=COLORS["contact"],
-        #        markersize=8, label="Contact", zorder=10, alpha=0.8)
-        axs[1].set_ylim([-32, 32])
-        axs[1].set_yticks([-30, -15, 0, 15, 30])
-        axs[1].set_xticks(np.linspace(0, 100, 11, endpoint=True))
-        axs[1].set_ylabel(r"Yaw [\$^\circ\$]")
-        axs[1].set_xlabel(r"Time [s]")
-
-        #axs[2].step(d["t_state_machine"], d["state_machine"], where='post', color=COLORS["dark_grey"])
-
     t_target = np.array([0, t_end])
-    axs[1].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target yaw", color="black")
+    axs[2].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target yaw", color="black")
     axs[0].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target \$x\$", color="black")
-    axs[0].set_xlim([0, t_end])
+    axs[0].set_xlim([0, t_end - min(start_times)])
     plt.setp(axs[0].get_xticklabels(), visible=False)
+    plt.setp(axs[1].get_xticklabels(), visible=False)
 
-    xlabelpad = 20
-    ylabelpad = 45
+    xlabelpad = 10
+    ylabelpad = 25
     tickpad = 20
 
     axs[0].tick_params(axis='both', pad=tickpad)
     axs[1].tick_params(axis='both', pad=tickpad)
+    axs[2].tick_params(axis='both', pad=tickpad)
    
     axs[0].yaxis.labelpad = ylabelpad
     axs[0].xaxis.labelpad = xlabelpad
     axs[1].yaxis.labelpad = ylabelpad
     axs[1].xaxis.labelpad = xlabelpad
+    axs[2].yaxis.labelpad = ylabelpad
+    axs[2].xaxis.labelpad = xlabelpad
 
-    #axs[2].set_yticks([0, 1, 2, 3, 4, 5, 6, 7])
-    #axs[2].set_ylim([-0.5, 7.5])
+    return fig
+
+def make_top_view_plot(data, end_times):
+    fig = plt.figure(figsize=6 * np.array([1, 2.6]))
+    gs = gridspec.GridSpec(4, 1, hspace=0.0, wspace=0.25,
+                           left=0.25, right=0.95, top=0.98, bottom=0.05) 
+
+    ax_top_view1 = fig.add_subplot(gs[0])
+    ax_top_view2 = fig.add_subplot(gs[1], sharey=ax_top_view1)
+    ax_top_view3 = fig.add_subplot(gs[2], sharey=ax_top_view1)
+    ax_top_view4 = fig.add_subplot(gs[3], sharey=ax_top_view1)
+    axs_top_view = [ax_top_view1, ax_top_view2, ax_top_view3, ax_top_view4]
+
+    t_end = max(end_times) + 1
+
+    for i, d in enumerate(data):
+        # Find end index
+        end_idx = np.argmax(d["t_pose"] > end_times[i])
+        start_idx = np.argmax(d["t_pose"] > start_times[i])
+        # Find first contact index
+        contacts = (d["state_machine"] == 2)
+        contact_idx = np.argmax(contacts)
+        # Find index of position closest to contact
+        contact_time = d["t_state_machine"][contact_idx]
+        pose_idx = np.argmin(np.abs(d["t_pose"] - contact_time))
+
+        if i < 4:
+            axs_top_view[0].plot(d["position"][start_idx:end_idx,0], d["position"][start_idx:end_idx,1],
+                            color=COLORS["delft_blue"], alpha=0.8)
+            axs_top_view[0].plot(d["position"][end_idx,0], d["position"][end_idx,1], marker="o", color=COLORS["dark_grey"],
+                        markersize=8, label="Perched", zorder=101, alpha=0.8)
+        elif i < 8:
+            axs_top_view[1].plot(d["position"][start_idx:end_idx,0], d["position"][start_idx:end_idx,1],
+                color=COLORS["delft_blue"], alpha=0.8)
+            axs_top_view[1].plot(d["position"][end_idx,0], d["position"][end_idx,1], marker="o", color=COLORS["dark_grey"],
+                        markersize=8, label="Perched", zorder=101, alpha=0.8)
+        elif i < 12:
+            axs_top_view[2].plot(d["position"][start_idx:end_idx,0], d["position"][start_idx:end_idx,1],
+                color=COLORS["delft_blue"], alpha=0.8)
+            axs_top_view[2].plot(d["position"][end_idx,0], d["position"][end_idx,1], marker="o", color=COLORS["dark_grey"],
+                        markersize=8, label="Perched", zorder=101, alpha=0.8)
+        else:
+            axs_top_view[3].plot(d["position"][start_idx:end_idx,0], d["position"][start_idx:end_idx,1],
+                color=COLORS["delft_blue"], alpha=0.8)
+            axs_top_view[3].plot(d["position"][end_idx,0], d["position"][end_idx,1], marker="o", color=COLORS["dark_grey"],
+                        markersize=8, label="Perched", zorder=101, alpha=0.8)
+        
+    xlabelpad = 30
+    ylabelpad = 45
+    tickpad = 25
+
+    for j in range(4):
+        rect = patches.Rectangle(
+            (-0.25, -10),      # bottom-left corner (x, y)
+            0.5, 20,        # width, height
+            linewidth=0,
+            facecolor=COLORS["color_trunk"],
+            alpha=0.5,
+            zorder=100
+        )
+        axs_top_view[j].add_patch(rect)
+        axs_top_view[j].yaxis.labelpad = ylabelpad
+        axs_top_view[j].xaxis.labelpad = xlabelpad
+        axs_top_view[j].tick_params(axis='both', pad=tickpad)
+        axs_top_view[j].set_yticks(np.linspace(-1.0, 1.0, 3, endpoint=True))
+        axs_top_view[j].set_ylabel(r"\$y\$ [m]")
+        axs_top_view[j].set_ylim([-1.3, 1.3])
+        axs_top_view[j].set_xlim([-2.0, 1.25])
+        axs_top_view[j].set_xticks(np.linspace(-2.0, 1.0, 4, endpoint=True))
+        axs_top_view[j].set_xticklabels([])
+        axs_top_view[j].set_aspect('equal')
+
+        box_x = 0.035      # x position
+        box_y = 0.24       # y position (top-left style positioning)
+        box_width = 0.2    # width as fraction of axes width
+        box_height = 0.2   # height as fraction of axes height
+        # Add the rounded rectangle with independent width/height control
+        rounded_box = FancyBboxPatch(
+            (box_x, box_y - box_height), box_width, box_height,  # subtract height for top-left positioning
+            boxstyle="round,pad=0.01",
+            facecolor='grey',
+            alpha=0.3,
+            edgecolor='none',
+            transform=axs_top_view[j].transAxes
+        )
+        axs_top_view[j].add_patch(rounded_box)
+
+        axs_top_view[j].text(-1.8, -1.05, rf"{roman_numerals[j]}")
+    
+    axs_top_view[-1].set_xlabel(r"\$x\$ [m]")
+    axs_top_view[-1].set_xticklabels(np.linspace(-2.0, 1.0, 4, endpoint=True))
 
     return fig
 
@@ -472,7 +585,6 @@ def make_contact_plot(data, end_time, index):
 
     return fig
 
-
 def main():
     paths = [
             "/home/antbre/Desktop/ZeroOffset/rosbags_2025_08_18/rosbag2-11_50_16_success_0_offset",
@@ -503,18 +615,23 @@ def main():
                           ])
     
     # Create and save time series plots
-    #fig = make_time_series_plot(data, end_times)
-    #fig.savefig("time_series_plot.svg")
+    fig = make_time_series_plot(data, end_times)
+    fig.savefig("time_series_plot.svg")
+
+    # Create and save top view plots
+    fig = make_top_view_plot(data, end_times)
+    fig.savefig("top_view_plot.svg")
 
     # Create and save contact threshold plot
     #fig = make_contact_plot(data, 54, -1)
     #fig.savefig("contact_plot.svg")
     
-    fig = make_3d_plot(data[[3, 7, 11, 13]],
-                       end_times[[3, 7, 11, 13]],
-                       trial_names=["III", "VII", "XI", "XIII"])
-    fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
-        transparent=False)
+    # Create and save 3D plots
+    #fig = make_3d_plot(data[[3, 7, 11, 13]],
+    #                   end_times[[3, 7, 11, 13]],
+    #                   trial_names=["III", "VII", "XI", "XIII"])
+    #fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
+    #    transparent=False)
 
 if __name__=="__main__":
     main()

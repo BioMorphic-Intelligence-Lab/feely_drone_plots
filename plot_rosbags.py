@@ -180,8 +180,8 @@ def process_data(data, cutoff=0):
 
 def make_time_series_plot(data, end_times):
     fig = plt.figure(figsize=6 * np.array([1.0, 1.25]))
-    gs = gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.25,
-                           left=0.2, right=0.98, top=0.9999, bottom=0.15) 
+    gs = gridspec.GridSpec(3, 1, hspace=0.075, wspace=0.25,
+                           left=0.15, right=0.99, top=0.9999, bottom=0.1) 
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
     ax3 = fig.add_subplot(gs[2], sharex=ax1)
@@ -237,8 +237,8 @@ def make_time_series_plot(data, end_times):
     plt.setp(axs[1].get_xticklabels(), visible=False)
 
     xlabelpad = 10
-    ylabelpad = 25
-    tickpad = 20
+    ylabelpad = 15
+    tickpad = 15
 
     axs[0].tick_params(axis='both', pad=tickpad)
     axs[1].tick_params(axis='both', pad=tickpad)
@@ -255,8 +255,8 @@ def make_time_series_plot(data, end_times):
 
 def make_top_view_plot(data, end_times):
     fig = plt.figure(figsize=6 * np.array([1, 2.6]))
-    gs = gridspec.GridSpec(4, 1, hspace=0.0, wspace=0.25,
-                           left=0.25, right=0.95, top=0.98, bottom=0.05) 
+    gs = gridspec.GridSpec(4, 1, hspace=0.05, wspace=0.25,
+                           left=0.25, right=0.98, top=1.0, bottom=0.075) 
 
     ax_top_view1 = fig.add_subplot(gs[0])
     ax_top_view2 = fig.add_subplot(gs[1], sharey=ax_top_view1)
@@ -298,7 +298,7 @@ def make_top_view_plot(data, end_times):
             axs_top_view[3].plot(d["position"][end_idx,0], d["position"][end_idx,1], marker="o", color=COLORS["dark_grey"],
                         markersize=8, label="Perched", zorder=101, alpha=0.8)
         
-    xlabelpad = 30
+    xlabelpad = 25
     ylabelpad = 45
     tickpad = 25
 
@@ -609,7 +609,7 @@ def main():
 
     data = np.array([process_data(rosbag2data(p)) for p in paths])
     end_times = np.array([43.0, 46.0, 35.0, 33.0,
-                          33.5, 43.4, 52.0, 48.0,
+                          33.5, 43.4, 52.0, 46.5,
                           32.0, 38.0, 37.0, 73.0,
                           41.0, 42.0
                           ])

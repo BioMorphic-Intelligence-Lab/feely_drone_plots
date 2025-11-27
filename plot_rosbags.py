@@ -346,9 +346,9 @@ def make_top_view_plot(data, end_times):
     return fig
 
 def make_3d_plot(data, end_times, trial_names):
-    fig = plt.figure(figsize=10 * np.array([1.5,1]))
-    gs = gridspec.GridSpec(2, 3, hspace=0.1, wspace=0.25,
-                           width_ratios=[1, 1, 0.05]) 
+    fig = plt.figure(figsize=10 * np.array([1.1, 1.0]))
+    gs = gridspec.GridSpec(3, 2, hspace=0.01, wspace=0.2,
+                           height_ratios=[1, 1, 0.025]) 
     axs = [
         fig.add_subplot(gs[0, 0], projection='3d'),
         fig.add_subplot(gs[1, 0], projection='3d'),
@@ -357,7 +357,7 @@ def make_3d_plot(data, end_times, trial_names):
     ]
 
     # Add legend axis spanning the bottom row
-    legend_ax = fig.add_subplot(gs[:, 2])
+    legend_ax = fig.add_subplot(gs[2, :])
 
     for i, d in enumerate(data):
 
@@ -404,10 +404,10 @@ def make_3d_plot(data, end_times, trial_names):
         axs[i].set_yticks(np.linspace(-1.5, 1.5, 4, endpoint=True))
         axs[i].set_zticks(np.linspace(0.0, 3.0, 4, endpoint=True))
 
-        xlabelpad = 20
-        ylabelpad = 20
-        zlabelpad = 20
-        tickpad = 10
+        xlabelpad = 10
+        ylabelpad = 10
+        zlabelpad = 2
+        tickpad = 1
 
         axs[i].tick_params(axis='both', pad=tickpad)
         axs[i].tick_params(axis='both', pad=tickpad)
@@ -424,10 +424,10 @@ def make_3d_plot(data, end_times, trial_names):
         overlay_ax.set_yticks([])
         
         # Define box dimensions independently
-        box_width = 0.5   # width as fraction of axes width
+        box_width = 0.62   # width as fraction of axes width
         box_height = 0.15  # height as fraction of axes height
         box_x = 0.05       # x position
-        box_y = 0.86       # y position (top-left style positioning)
+        box_y = 0.95       # y position (top-left style positioning)
         
         # Add the rounded rectangle with independent width/height control
         rounded_box = FancyBboxPatch(
@@ -441,38 +441,40 @@ def make_3d_plot(data, end_times, trial_names):
         overlay_ax.add_patch(rounded_box)
 
         # Add text in the top-left corner
-        axs[i].text2D(0.1, 0.8, rf"Trial {trial_names[i]}", 
+        txt = axs[i].text2D(0.075, 0.94, trial_names[i], 
                     transform=axs[i].transAxes, 
                     fontsize=12,  
                     ha="left", va="top")
+        txt.set_in_layout(False)
+
 
     legend_ax.clear()  # Clear any existing content
 
     # Create custom alpha representation
     for j in range(100):
         alpha_val = (j + 1) / 100.0  # From 0.01 to 1.0
-        legend_ax.axhspan(j, j+1, color=COLORS["delft_blue"], alpha=alpha_val)
+        legend_ax.axvspan(j, j+1, color=COLORS["delft_blue"], alpha=alpha_val)
 
     # Customize the legend axis
-    legend_ax.set_xlim(0, 1)
-    legend_ax.set_ylim(0, 100)
-    legend_ax.set_ylabel(r'Trial Progression [%]', fontsize=12)
+    legend_ax.set_ylim(0, 1)
+    legend_ax.set_xlim(0, 100)
+    legend_ax.set_xlabel(r'Trial Progression [%]', fontsize=12)
 
-    legend_ax.yaxis.tick_right()
-    legend_ax.yaxis.set_label_position("right")
+    #legend_ax.yaxis.tick_right()
+    #legend_ax.yaxis.set_label_position("right")
 
     # Set ticks
-    legend_ax.set_yticks(np.linspace(0, 100, 5, endpoint=True))
-    legend_ax.set_xticks([])
+    legend_ax.set_xticks(np.linspace(0, 100, 5, endpoint=True))
+    legend_ax.set_yticks([])
 
     # Remove unnecessary spines
-    legend_ax.spines['bottom'].set_visible(False)
+    legend_ax.spines['bottom'].set_visible(True)
     legend_ax.spines['top'].set_visible(False)
     legend_ax.spines['left'].set_visible(False)
-    legend_ax.spines['right'].set_visible(True)
+    legend_ax.spines['right'].set_visible(False)
 
-    legend_ax.tick_params(axis='y', pad=ylabelpad)
-    legend_ax.yaxis.labelpad = 1.5 * ylabelpad
+    legend_ax.tick_params(axis='x', pad=xlabelpad)
+    legend_ax.xaxis.labelpad = xlabelpad
     
     return fig
 
@@ -615,23 +617,26 @@ def main():
                           ])
     
     # Create and save time series plots
-    fig = make_time_series_plot(data, end_times)
-    fig.savefig("time_series_plot.svg")
+    #fig = make_time_series_plot(data, end_times)
+    #fig.savefig("time_series_plot.svg")
 
     # Create and save top view plots
-    fig = make_top_view_plot(data, end_times)
-    fig.savefig("top_view_plot.svg")
+    #fig = make_top_view_plot(data, end_times)
+    #fig.savefig("top_view_plot.svg")
 
     # Create and save contact threshold plot
     #fig = make_contact_plot(data, 54, -1)
     #fig.savefig("contact_plot.svg")
     
     # Create and save 3D plots
-    #fig = make_3d_plot(data[[3, 7, 11, 13]],
-    #                   end_times[[3, 7, 11, 13]],
-    #                   trial_names=["III", "VII", "XI", "XIII"])
-    #fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.5,
-    #    transparent=False)
+    fig = make_3d_plot(data[[3, 7, 11, 13]],
+                       end_times[[3, 7, 11, 13]],
+                       trial_names=[r"No Offset (III):\\  (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
+                                    r"Rotational Offset (VII):\\ (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{20}{\degree}\$)",
+                                    r"Positional Offset (XI):\\ (\$\SI{-0.6}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
+                                    r"Combined Offset (XIII):\\ (\$\SI{-0.25}{\meter}\$, \$\SI{-0.25}{\meter}\$, \$\SI{-15}{\degree}\$)"])
+    fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.35,
+        transparent=False)
 
 if __name__=="__main__":
     main()

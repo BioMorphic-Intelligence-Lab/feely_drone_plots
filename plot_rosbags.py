@@ -179,20 +179,33 @@ def process_data(data, cutoff=0):
     return data
 
 def make_time_series_plot(data, end_times):
-    fig = plt.figure(figsize=6 * np.array([1.0, 1.25]))
-    gs = gridspec.GridSpec(3, 1, hspace=0.075, wspace=0.25,
+    fig = plt.figure(figsize=6 * np.array([1.0, 1.7]))
+    gs = gridspec.GridSpec(2, 1, hspace=0.075, wspace=0.25,
                            left=0.15, right=0.99, top=0.9999, bottom=0.1) 
     ax1 = fig.add_subplot(gs[0])
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    ax3 = fig.add_subplot(gs[2], sharex=ax1)
-    axs = [ax1, ax2, ax3]
+    #ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    ax3 = fig.add_subplot(gs[1], sharex=ax1)
+    axs = [ax1,
+           #ax2,
+           ax3]
 
     t_end = max(end_times) + 1
 
     for i, d in enumerate(data):
+
         # Find end index
         end_idx = np.argmax(d["t_pose"] > end_times[i])
         start_idx = np.argmax(d["t_pose"] > start_times[i])
+
+        # Extract position and yaw
+        position =  d["position"][start_idx:end_idx, :]
+        yaw = d["yaw"][start_idx:end_idx]
+
+        # Sliding window average
+        window_size = 100  # Adjust the window size as needed
+        yaw = np.convolve(yaw, np.ones(window_size)/window_size, mode='valid')
+        #position[:, 0] = np.convolve(position[:, 0], np.ones(window_size)/window_size, mode='valid')
+
         # Find first contact index
         contacts = (d["state_machine"] == 2)
         contact_idx = np.argmax(contacts)
@@ -202,35 +215,35 @@ def make_time_series_plot(data, end_times):
 
 
         axs[0].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
-                    d["position"][start_idx:end_idx,0], label=r"\$x\$", color=COLORS["color_x"], alpha=0.4)
+                    position[:, 0], label=r"\$x\$", color=COLORS["color_x"], alpha=0.4)
         axs[0].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
-                    d["position"][end_idx, 0], marker="o", color=COLORS["dark_grey"],
+                    position[-1, 0], marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)
-        axs[1].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
-                    d["position"][start_idx:end_idx,1], label=r"\$y\$", color=COLORS["color_y"], alpha=0.4)
-        axs[1].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
-                    d["position"][end_idx, 1], marker="o", color=COLORS["dark_grey"],
-                    markersize=8, label="Perched", zorder=10, alpha=0.8)
-        axs[2].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
-                    d["yaw"][start_idx:end_idx] * 180/np.pi, label="yaw", color=COLORS["color_yaw"], alpha=0.8)
-        axs[2].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
-                    d["yaw"][end_idx] * 180/np.pi, marker="o", color=COLORS["dark_grey"],
+        #axs[1].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
+        #            d["position"][start_idx:end_idx,1], label=r"\$y\$", color=COLORS["color_y"], alpha=0.4)
+        #axs[1].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+        #            d["position"][end_idx, 1], marker="o", color=COLORS["dark_grey"],
+        #            markersize=8, label="Perched", zorder=10, alpha=0.8)
+        axs[1].plot(d["t_pose"][start_idx+window_size//2:end_idx-window_size//2 + 1]-d["t_pose"][start_idx+window_size//2],
+                    yaw * 180/np.pi, label="yaw", color=COLORS["color_yaw"], alpha=0.8)
+        axs[1].plot(d["t_pose"][end_idx-window_size//2 + 1]-d["t_pose"][start_idx+window_size//2],
+                    yaw[-1] * 180/np.pi, marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)    
 
     axs[0].set_ylabel(r"\$x\$ [m]")
     axs[0].set_yticks(np.linspace(-2.0, 1.0, 4, endpoint=True))
 
-    axs[1].set_ylabel(r"\$y\$ [m]")
-    axs[1].set_yticks(np.linspace(-1.0, 1.0, 3, endpoint=True))
-    axs[2].set_ylim([-32, 32])
-    axs[2].set_yticks([-30, -15, 0, 15, 30])
-    axs[2].set_xticks(np.linspace(0, 100, 11, endpoint=True))
-    axs[2].set_ylabel(r"Yaw [\$^\circ\$]")
-    axs[2].set_xlabel(r"Time [s]")
+    #axs[1].set_ylabel(r"\$y\$ [m]")
+    #axs[1].set_yticks(np.linspace(-1.0, 1.0, 3, endpoint=True))
+    axs[1].set_ylim([-32, 32])
+    axs[1].set_yticks([-30, -15, 0, 15, 30])
+    axs[1].set_xticks(np.linspace(0, 100, 11, endpoint=True))
+    axs[1].set_ylabel(r"Yaw [\$^\circ\$]")
+    axs[1].set_xlabel(r"Time [s]")
 
         
     t_target = np.array([0, t_end])
-    axs[2].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target yaw", color="black")
+    axs[1].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target yaw", color="black")
     axs[0].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target \$x\$", color="black")
     axs[0].set_xlim([0, t_end - min(start_times)])
     plt.setp(axs[0].get_xticklabels(), visible=False)
@@ -241,15 +254,15 @@ def make_time_series_plot(data, end_times):
     tickpad = 15
 
     axs[0].tick_params(axis='both', pad=tickpad)
+    #axs[1].tick_params(axis='both', pad=tickpad)
     axs[1].tick_params(axis='both', pad=tickpad)
-    axs[2].tick_params(axis='both', pad=tickpad)
    
     axs[0].yaxis.labelpad = ylabelpad
     axs[0].xaxis.labelpad = xlabelpad
+    #axs[1].yaxis.labelpad = ylabelpad
+    #axs[1].xaxis.labelpad = xlabelpad
     axs[1].yaxis.labelpad = ylabelpad
     axs[1].xaxis.labelpad = xlabelpad
-    axs[2].yaxis.labelpad = ylabelpad
-    axs[2].xaxis.labelpad = xlabelpad
 
     return fig
 
@@ -479,7 +492,7 @@ def make_3d_plot(data, end_times, trial_names):
     return fig
 
 def make_contact_plot(data, end_time, index):
-    fig = plt.figure(figsize=7 * np.array([2.5,1]))
+    fig = plt.figure(figsize=7 * np.array([3.0, 1]))
     gs = gridspec.GridSpec(2, 1, hspace=0.2, wspace=0.15,
                            left=0.08, right=0.98, top=0.95, bottom=0.15,
                            height_ratios=[2, 1]) 
@@ -617,8 +630,8 @@ def main():
                           ])
     
     # Create and save time series plots
-    #fig = make_time_series_plot(data, end_times)
-    #fig.savefig("time_series_plot.svg")
+    fig = make_time_series_plot(data, end_times)
+    fig.savefig("time_series_plot.svg")
 
     # Create and save top view plots
     #fig = make_top_view_plot(data, end_times)
@@ -629,14 +642,14 @@ def main():
     #fig.savefig("contact_plot.svg")
     
     # Create and save 3D plots
-    fig = make_3d_plot(data[[3, 7, 11, 13]],
-                       end_times[[3, 7, 11, 13]],
-                       trial_names=[r"No Offset (III):\\  (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
-                                    r"Rotational Offset (VII):\\ (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{20}{\degree}\$)",
-                                    r"Positional Offset (XI):\\ (\$\SI{-0.6}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
-                                    r"Combined Offset (XIII):\\ (\$\SI{-0.25}{\meter}\$, \$\SI{-0.25}{\meter}\$, \$\SI{-15}{\degree}\$)"])
-    fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.35,
-        transparent=False)
+    #fig = make_3d_plot(data[[3, 7, 11, 13]],
+    #                   end_times[[3, 7, 11, 13]],
+    #                   trial_names=[r"No Offset (III):\\  (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
+    #                                r"Rotational Offset (VII):\\ (\$\SI{0.0}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{20}{\degree}\$)",
+    #                                r"Positional Offset (XI):\\ (\$\SI{-0.6}{\meter}\$, \$\SI{0.0}{\meter}\$, \$\SI{0.0}{\degree}\$)",
+    #                                r"Combined Offset (XIII):\\ (\$\SI{-0.25}{\meter}\$, \$\SI{-0.25}{\meter}\$, \$\SI{-15}{\degree}\$)"])
+    #fig.savefig(f"3d_plot.svg", bbox_inches='tight', pad_inches=0.35,
+    #    transparent=False)
 
 if __name__=="__main__":
     main()

@@ -42,10 +42,10 @@ start_times = [2, 0, 5, 6,
                5, 5, 7, 5,
                8, 8]
 
-roman_numerals = ['(i)', '(ii)', '(iii)', '(iv)',
-                  '(v)', '(vi)', '(vii)', '(viii)',
-                  '(ix)', '(x)', '(xi)', '(xii)',
-                  '(xiii)', '(xiv)']
+roman_numerals = ['(I)', '(II)', '(III)', '(IV)',
+                  '(V)', '(VI)', '(VII)', '(VIII)',
+                  '(IX)', '(X)', '(XI)', '(XII)',
+                  '(XIII)', '(XIV)']
 
 def guess_msgtype(path: Path) -> str:
     """Guess message type name from path."""
@@ -191,6 +191,10 @@ def make_time_series_plot(data, end_times):
 
     t_end = max(end_times) + 1
 
+    axs[0].set_ylim([-2.2, 1.2])
+
+    offset1 = -0.15
+    offset2 = -0.15
     for i, d in enumerate(data):
 
         # Find end index
@@ -202,7 +206,7 @@ def make_time_series_plot(data, end_times):
         yaw = d["yaw"][start_idx:end_idx]
 
         # Sliding window average
-        window_size = 100  # Adjust the window size as needed
+        window_size = 150  # Adjust the window size as needed
         yaw = np.convolve(yaw, np.ones(window_size)/window_size, mode='valid')
         #position[:, 0] = np.convolve(position[:, 0], np.ones(window_size)/window_size, mode='valid')
 
@@ -219,6 +223,50 @@ def make_time_series_plot(data, end_times):
         axs[0].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
                     position[-1, 0], marker="o", color=COLORS["dark_grey"],
                     markersize=8, label="Perched", zorder=10, alpha=0.8)
+        
+         # up/down alternating offset
+        """if position[-1, 0] < 0:
+            offset1 *= -1
+            ymin = -1.8 + offset1
+            ymax = 0
+
+            axs[0].text(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                        ymin - 0.05,
+                        f"{roman_numerals[i]}",
+                        color=COLORS["dark_grey"], fontsize=10,
+                        va="top",
+                        ha="center")
+
+            # Normalize to [0,1] range inside the axes
+            y0, y1 = axs[0].get_ylim()
+            ymin_norm = (ymin - y0) / (y1 - y0)
+            ymax_norm = (ymax - y0) / (y1 - y0)
+            axs[0].axvline(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                           ymin=ymin_norm,
+                           ymax=ymax_norm,
+                           color=COLORS["dark_grey"],
+                           linestyle="--", alpha=0.5)
+        else:
+            offset2 *= -1
+            ymin = 0
+            ymax = 0.8 + offset2
+
+            axs[0].text(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                        ymax + 0.05,
+                        f"{roman_numerals[i]}",
+                        color=COLORS["dark_grey"], fontsize=10,
+                        va="bottom",
+                        ha="center")
+            # Normalize to [0,1] range inside the axes
+            y0, y1 = axs[0].get_ylim()
+            ymin_norm = (ymin - y0) / (y1 - y0)
+            ymax_norm = (ymax - y0) / (y1 - y0)
+            axs[0].axvline(d["t_pose"][end_idx]-d["t_pose"][start_idx],
+                           ymin=ymin_norm,
+                           ymax=ymax_norm,
+                           color=COLORS["dark_grey"],
+                           linestyle="--", alpha=0.5)
+        """
         #axs[1].plot(d["t_pose"][start_idx:end_idx]-d["t_pose"][start_idx],
         #            d["position"][start_idx:end_idx,1], label=r"\$y\$", color=COLORS["color_y"], alpha=0.4)
         #axs[1].plot(d["t_pose"][end_idx]-d["t_pose"][start_idx],
@@ -247,7 +295,7 @@ def make_time_series_plot(data, end_times):
     axs[0].plot(t_target, np.zeros_like(t_target), linestyle="--", label=r"target \$x\$", color="black")
     axs[0].set_xlim([0, t_end - min(start_times)])
     plt.setp(axs[0].get_xticklabels(), visible=False)
-    plt.setp(axs[1].get_xticklabels(), visible=False)
+    #plt.setp(axs[1].get_xticklabels(), visible=False)
 
     xlabelpad = 10
     ylabelpad = 15
@@ -439,7 +487,7 @@ def make_3d_plot(data, end_times, trial_names):
         # Define box dimensions independently
         box_width = 0.62   # width as fraction of axes width
         box_height = 0.15  # height as fraction of axes height
-        box_x = 0.05       # x position
+        box_x = 0.25       # x position
         box_y = 0.95       # y position (top-left style positioning)
         
         # Add the rounded rectangle with independent width/height control
@@ -454,7 +502,7 @@ def make_3d_plot(data, end_times, trial_names):
         overlay_ax.add_patch(rounded_box)
 
         # Add text in the top-left corner
-        txt = axs[i].text2D(0.075, 0.94, trial_names[i], 
+        txt = axs[i].text2D(0.275, 0.94, trial_names[i], 
                     transform=axs[i].transAxes, 
                     fontsize=12,  
                     ha="left", va="top")
@@ -492,10 +540,10 @@ def make_3d_plot(data, end_times, trial_names):
     return fig
 
 def make_contact_plot(data, end_time, index):
-    fig = plt.figure(figsize=7 * np.array([3.0, 1]))
+    fig = plt.figure(figsize=7 * np.array([1.75, 1]))
     gs = gridspec.GridSpec(2, 1, hspace=0.2, wspace=0.15,
                            left=0.08, right=0.98, top=0.95, bottom=0.15,
-                           height_ratios=[2, 1]) 
+                           height_ratios=[3, 1]) 
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
     #ax3 = fig.add_subplot(gs[2], sharex=ax1)

@@ -136,9 +136,16 @@ ax.set_xticks(np.linspace(-lim, lim, 5))
 ax.set_yticks(np.linspace(-lim, lim, 5))
 ax.set_zticks(np.linspace(2-lim, 2+lim, 3))
 
-ax.set_xlabel(r"x [\$m\$]")
-ax.set_ylabel(r"y [\$m\$]")
-ax.set_zlabel(r"z [\$m\$]")
+#ax.set_xlabel(r"x [\$m\$]")
+#ax.set_ylabel(r"y [\$m\$]")
+#ax.set_zlabel(r"z [\$m\$]")
 
-fig.savefig("search_pattern.svg", bbox_inches='tight', pad_inches=0.3,
+ax.set_xticklabels([])
+ax.set_yticklabels([])
+ax.set_zticklabels([])
+ax.xaxis.labelpad = -5
+ax.yaxis.labelpad = -5
+ax.zaxis.labelpad = -12
+
+fig.savefig("search_pattern.svg", bbox_inches='tight', pad_inches=0.0,
             transparent=True)

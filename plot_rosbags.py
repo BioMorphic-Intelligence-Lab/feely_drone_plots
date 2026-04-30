@@ -68,6 +68,10 @@ def rosbag2data(path: str):
         msgdef = msgpath.read_text(encoding='utf-8')
         add_types.update(get_types_from_msg(msgdef, guess_msgtype(msgpath)))
 
+    TOUCH_DATA_OLD = "std_msgs/Header header\nint64[] raw_data\nint64[] filtered_data\nint64[] baseline_data"
+    add_types.update(get_types_from_msg(
+        TOUCH_DATA_OLD, 'custom_msgs/msg/TouchDataOld'))
+
     typestore.register(add_types)
 
     ##############################################################
@@ -117,7 +121,11 @@ def rosbag2data(path: str):
                 t_contact += [float(msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec)]
                 contact += [msg.position]
             if connection.topic == '/feely_drone/out/touch_data':
-                msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
+                try:
+                    msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
+                except Exception:
+                    msg = typestore.deserialize_cdr(
+                        rawdata, 'custom_msgs/msg/TouchDataOld')
                 t_touch += [float(msg.header.stamp.sec + 1e-9 * msg.header.stamp.nanosec)]
                 touch_data += [msg.raw_data]
             if connection.topic == '/feely_drone/out/state_machine_state':
@@ -179,9 +187,9 @@ def process_data(data, cutoff=0):
     return data
 
 def make_time_series_plot(data, end_times):
-    fig = plt.figure(figsize=6 * np.array([1.0, 1.7]))
-    gs = gridspec.GridSpec(2, 1, hspace=0.075, wspace=0.25,
-                           left=0.15, right=0.99, top=0.9999, bottom=0.1) 
+    fig = plt.figure(figsize=6 * np.array([2.2, 0.9]))
+    gs = gridspec.GridSpec(2, 1, hspace=0.1, wspace=0.01,
+                           left=0.075, right=0.99, top=0.975, bottom=0.15) 
     ax1 = fig.add_subplot(gs[0])
     #ax2 = fig.add_subplot(gs[1], sharex=ax1)
     ax3 = fig.add_subplot(gs[1], sharex=ax1)
